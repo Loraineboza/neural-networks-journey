@@ -27,7 +27,6 @@ y_true = torch.tensor([
 def mse_loss(pred, true):
     return ((pred - true) ** 2).mean()
 
-
 lr = 5.0
 for i in range(0, 200):
     y_pred = torch.sigmoid(torch.mm(X, w) + b)
@@ -40,9 +39,8 @@ for i in range(0, 200):
 
         w.grad.zero_()
         b.grad.zero_()
-    if i % 10:
-        print(f"ошибка: {loss}")
-print("-"*40)
+
+print("debug:")
 print("обучение нейрона завершено. Итоговые веса:")
 print(f"  Вес расстояния от авто: {w[0].item():.4f}")
 print(f"  Вес скорости авто:   {w[1].item():.4f}")
