@@ -6,7 +6,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from random import randint
-import matplotlib.pyplot as plt  # ← ИМПОРТ
+import matplotlib.pyplot as plt  # ← import 
 
 class Xor(nn.Module):
     def __init__(this, i, io, o):
@@ -28,9 +28,7 @@ def main():
     optimizer = torch.optim.RMSprop(params=model.parameters(), lr=15.)
     error_f = torch.nn.MSELoss()
     
-    # ========================================
-    # СПИСОК ДЛЯ ПОТЕРЬ
-    # ========================================
+    # добавь список потерь
     losses = []
     
     model.train()
@@ -42,14 +40,10 @@ def main():
         loss.backward()
         optimizer.step()
         
-        # ========================================
-        # СОХРАНЯЕМ ПОТЕРЮ
-        # ========================================
+        # сохраняй все потери
         losses.append(loss.item())
     
-    # ========================================
-    # РИСУЕМ ГРАФИК
-    # ========================================
+    # создай график
     plt.figure(figsize=(10, 4))
     
     plt.subplot(1, 2, 1)
@@ -67,11 +61,8 @@ def main():
     plt.grid(True, alpha=0.3)
     
     plt.tight_layout()
-    plt.show()  # ← ПОКАЖЕТ ГРАФИК
+    plt.show()  # и отобрази его
     
-    # ========================================
-    # ТЕСТИРОВАНИЕ
-    # ========================================
     model.eval()
     with torch.no_grad():
         print("result:")
