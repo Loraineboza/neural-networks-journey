@@ -1,0 +1,370 @@
+Set-Alias -Name vim -Value nvim -ErrorAction SilentlyContinue
+
+function cd {
+    param([string]$Path)
+    
+    if ($Path -eq "-") {
+        # Переход в предыдущую директорию
+        if ($global:OLDPWD) {
+            Set-Location $global:OLDPWD
+        }
+    } elseif ($Path -eq "~" -or $Path -eq "") {
+        Set-Location $HOME
+    } elseif ($Path -eq "..") {
+        Set-Location ..
+    } else {
+        $global:OLDPWD = (Get-Location).Path
+        Set-Location $Path
+    }
+}
+
+# pwd с поддержкой -P
+function pwd {
+    param([switch]$P)
+    if ($P) {
+        (Get-Location).Path
+    } else {
+        Get-Location
+    }
+}
+
+function l {
+    Get-ChildItem -Name
+}
+
+function ll {
+    Get-ChildItem -Force | Format-Table -AutoSize
+}
+
+function la {
+    Get-ChildItem -Force -Name
+}
+
+function ls-l {
+    Get-ChildItem -Force | Format-Table -AutoSize
+}
+
+# Переопределяем ls для поддержки -l, -la, -a
+function ls {
+    param(
+        [string]$Path = ".",
+        [switch]$l,
+        [switch]$a,
+        [switch]$la,
+        [switch]$al
+    )
+    
+    if ($l) {
+        Get-ChildItem -Path $Path -Force | Format-Table -AutoSize
+    } elseif ($a) {
+        Get-ChildItem -Path $Path -Force -Name
+    } elseif ($la -or $al) {
+        Get-ChildItem -Path $Path -Force | Format-Table -AutoSize
+    } else {
+        Get-ChildItem -Path $Path
+    }
+}
+
+# grep с поддержкой -r, -i и других флагов
+function grep {
+    param(
+        [string]$Pattern,
+        [string]$Path = ".",
+        [switch]$r,
+        [switch]$i,
+        [switch]$n,
+        [switch]$v,
+        [switch]$c
+    )
+    
+    $params = @{}
+    if ($r) { $params.Recurse = $true }
+    if ($i) { $params.CaseSensitive = $false } else { $params.CaseSensitive = $true }
+    if ($n) { 
+        Get-ChildItem -Path $Path -Recurse:$r -File -ErrorAction SilentlyContinue | 
+            Select-String -Pattern $Pattern -CaseSensitive:(!$i) | 
+            ForEach-Object { "$($_.Filename):$($_.LineNumber):$($_.Line)" }
+        return
+    }
+    if ($v) {
+        Get-ChildItem -Path $Path -Recurse:$r -File -ErrorAction SilentlyContinue | 
+            Select-String -Pattern $Pattern -NotMatch -CaseSensitive:(!$i)
+        return
+    }
+    if ($c) {
+        $count = (Get-ChildItem -Path $Path -Recurse:$r -File -ErrorAction SilentlyContinue | 
+                  Select-String -Pattern $Pattern -CaseSensitive:(!$i)).Count
+        Write-Host $count
+        return
+    }
+    
+    Get-ChildItem -Path $Path -Recurse:$r -File -ErrorAction SilentlyContinue | 
+        Select-String -Pattern $Pattern -CaseSensitive:(!$i)
+}
+
+# rm с поддержкой -rf
+function rm {
+    param(
+        [string]$Path,
+        [switch]$r,
+        [switch]$f,
+        [switch]$rf
+    )
+    
+    if ($r -or $rf) {
+        Remove-Item -Path $Path -Recurse -Force -ErrorAction SilentlyContinue
+    } elseif ($f) {
+        Remove-Item -Path $Path -Force -ErrorAction SilentlyContinue
+    } else {
+        Remove-Item -Path $Path -ErrorAction SilentlyContinue
+    }
+}
+
+# cp с поддержкой -r
+function cp {
+    param(
+        [string]$Source,
+        [string]$Destination,
+        [switch]$r
+    )
+    
+    if ($r) {
+        Copy-Item -Path $Source -Destination $Destination -Recurse
+    } else {
+        Copy-Item -Path $Source -Destination $Destination
+    }
+}
+
+# mv с поддержкой -f
+function mv {
+    param(
+        [string]$Source,
+        [string]$Destination,
+        [switch]$f
+    )
+    
+    if ($f) {
+        Move-Item -Path $Source -Destination $Destination -Force
+    } else {
+        Move-Item -Path $Source -Destination $Destination
+    }
+}
+	
+
+function which {
+    param(
+        [string]$Command,
+        [switch]$a
+    )
+    if ($a) {
+        Get-Command -Name $Command -All | Select-Object -ExpandProperty Source
+    } else {
+        Get-Command -Name $Command | Select-Object -ExpandProperty Source
+    }
+}
+
+function p11 {
+    py -3.11 @args
+}
+
+function pip11 {
+    py -3.11 -m pip @args
+}
+
+# ============================================
+# UNIX-подобные команды для PowerShell
+# ============================================
+
+# Базовые алиасы
+Set-Alias -Name which -Value Get-Command -ErrorAction SilentlyContinue
+
+# touch - создание файла
+function touch {
+    param([string]$path)
+    if (Test-Path $path) {
+        (Get-Item $path).LastWriteTime = Get-Date
+    } else {
+        New-Item -Path $path -ItemType File | Out-Null
+    }
+}
+
+# grep - поиск текста в файлах
+function grep {
+    param(
+        [string]$pattern,
+        [string]$path = "."
+    )
+    Get-ChildItem -Path $path -Recurse -File -ErrorAction SilentlyContinue | 
+        Select-String -Pattern $pattern
+}
+
+# find - поиск файлов
+function find {
+    param(
+        [string]$name,
+        [string]$path = "."
+    )
+    Get-ChildItem -Path $path -Recurse -Filter $name -ErrorAction SilentlyContinue
+}
+
+# du - размер директории
+function du {
+    param([string]$path = ".")
+    if (Test-Path $path) {
+        $size = (Get-ChildItem -Path $path -Recurse -File -ErrorAction SilentlyContinue | 
+                 Measure-Object -Property Length -Sum).Sum
+        if ($size -gt 1TB) {
+            "{0:N2} TB" -f ($size / 1TB)
+        } elseif ($size -gt 1GB) {
+            "{0:N2} GB" -f ($size / 1GB)
+        } elseif ($size -gt 1MB) {
+            "{0:N2} MB" -f ($size / 1MB)
+        } elseif ($size -gt 1KB) {
+            "{0:N2} KB" -f ($size / 1KB)
+        } else {
+            "$size B"
+        }
+    } else {
+        Write-Host Put ne naiden: $path -ForegroundColor Red
+    }
+}
+
+# tree - дерево папок
+function tree {
+    param(
+        [string]$path = ".",
+        [int]$depth = 3
+    )
+    function Show-Tree {
+        param(
+            [string]$currentPath,
+            [string]$indent = "",
+            [int]$currentDepth = 0
+        )
+        if ($currentDepth -gt $depth) { return }
+        
+        $items = Get-ChildItem -Path $currentPath -ErrorAction SilentlyContinue
+        foreach ($item in $items) {
+            if ($item.PSIsContainer) {
+                Write-Host "$indent+-- $($item.Name)/" -ForegroundColor Cyan
+                Show-Tree -currentPath $item.FullName -indent "$indent|   " -currentDepth ($currentDepth + 1)
+            } else {
+                $size = if ($item.Length -gt 1MB) {
+                    "{0:N1} MB" -f ($item.Length / 1MB)
+                } elseif ($item.Length -gt 1KB) {
+                    "{0:N1} KB" -f ($item.Length / 1KB)
+                } else {
+                    "$($item.Length) B"
+                }
+                Write-Host "$indent+-- $($item.Name) ($size)" -ForegroundColor White
+            }
+        }
+    }
+    
+    $pathName = if ($path -eq ".") { (Get-Location).Path } else { $path }
+    Write-Host "$pathName/" -ForegroundColor Yellow
+    Show-Tree -currentPath $path
+}
+
+# head - первые строки файла
+function head {
+    param(
+        [string]$path,
+        [int]$lines = 10
+    )
+    Get-Content -Path $path -Head $lines
+}
+
+# tail - последние строки файла
+function tail {
+    param(
+        [string]$path,
+        [int]$lines = 10
+    )
+    Get-Content -Path $path -Tail $lines
+}
+
+# wc - подсчет строк/слов/байт
+function wc {
+    param([string]$path)
+    $content = Get-Content -Path $path -ErrorAction SilentlyContinue
+    $lines = $content.Count
+    $words = ($content | ForEach-Object { $_ -split '\s+' | Where-Object { $_ } }).Count
+    $chars = ($content | Measure-Object -Character).Characters
+    Write-Host "$lines strings, $words words, $chars chars" -ForegroundColor Green
+}
+
+# ps - список процессов
+function ps {
+    param([string]$name)
+    if ($name) {
+        Get-Process -Name "*$name*" | Format-Table -AutoSize
+    } else {
+        Get-Process | Format-Table -AutoSize
+    }
+}
+
+# kill - убить процесс по PID
+function kill {
+    param([int]$pid)
+    Stop-Process -Id $pid -Force
+}
+
+# df - информация о дисках
+function df {
+    Get-PSDrive -PSProvider FileSystem | 
+        Select-Object @{N=Filesystem;E={$_.Root}},
+                      @{N=Size;E={"{0:N2} GB" -f (($_.Used + $_.Free) / 1GB)}},
+                      @{N=Used;E={"{0:N2} GB" -f ($_.Used / 1GB)}},
+                      @{N=Avail;E={"{0:N2} GB" -f ($_.Free / 1GB)}},
+                      @{N=Use%;E={[math]::Round(($_.Used / ($_.Used + $_.Free)) * 100)}} |
+        Format-Table -AutoSize
+}
+
+# wget - скачивание файлов
+function wget {
+    param(
+        [string]$url,
+        [string]$output
+    )
+    if ($output) {
+        Invoke-WebRequest -Uri $url -OutFile $output
+    } else {
+        Invoke-WebRequest -Uri $url
+    }
+}
+
+# curl - запросы к серверу
+function curl {
+    param(
+        [string]$url,
+        [string]$method = "GET"
+    )
+    Invoke-WebRequest -Uri $url -Method $method
+}
+
+# unzip - распаковка zip
+function unzip {
+    param(
+        [string]$zipPath,
+        [string]$destination = "."
+    )
+    Expand-Archive -Path $zipPath -DestinationPath $destination -Force
+}
+
+# zip - упаковка в zip
+function zip {
+    param(
+        [string]$sourcePath,
+        [string]$destinationPath
+    )
+    Compress-Archive -Path $sourcePath -DestinationPath $destinationPath -Force
+}
+
+# whoami - кто я
+function whoami {
+    [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
+}
+
+Write-Host Unix-commands loaded -ForegroundColor Green
+Write-Host Available: touch, grep, find, du, tree, head, tail, wc, ps, kill, df, wget, curl, unzip, zip, whoami -ForegroundColor Yellow
